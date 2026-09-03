@@ -17,8 +17,8 @@ durante a palestra.
 
 ## Requisitos
 
-- Java 17
-- Maven (ou o wrapper `./mvnw`, se presente)
+- Java 17 (o Maven em si **não** precisa estar instalado — o projeto já inclui o Maven
+  Wrapper, `./mvnw` / `mvnw.cmd`, que baixa e usa a versão correta do Maven sozinho)
 - Um navegador baseado em Chromium — **Google Chrome** ou **Microsoft Edge** — pois a Web
   Speech API (reconhecimento de fala) não é suportada em todos os navegadores (por exemplo,
   Firefox não suporta).
@@ -32,10 +32,12 @@ durante a palestra.
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
-mvn spring-boot:run
+./mvnw spring-boot:run
 ```
 
-(ou `./mvnw spring-boot:run`, caso o wrapper esteja presente)
+No Windows (PowerShell/cmd): `mvnw.cmd spring-boot:run`.
+
+Se preferir usar um Maven já instalado no seu sistema, `mvn spring-boot:run` também funciona.
 
 Depois, acesse [http://localhost:8080](http://localhost:8080).
 
@@ -68,5 +70,5 @@ buildável e executável a partir de lá:
 
 ```bash
 cd legacy/cadastro-pj
-mvn spring-boot:run
+./mvnw spring-boot:run
 ```
