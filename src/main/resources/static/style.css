@@ -1,0 +1,242 @@
+:root {
+    --bg: #0f1115;
+    --bg-panel: #171a21;
+    --bg-card: #1f2330;
+    --border: #2a2f3d;
+    --text: #f2f4f8;
+    --text-dim: #9aa1b0;
+    --accent: #4f8cff;
+    --accent-2: #7c5cff;
+    --red: #ff5470;
+    --green: #35d68a;
+    --amber: #ffb84f;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 18px;
+    line-height: 1.5;
+}
+
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 32px;
+    border-bottom: 1px solid var(--border);
+}
+
+.app-header h1 {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 22px;
+    border-radius: 999px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    background: var(--bg-card);
+    border: 2px solid var(--border);
+}
+
+.status-pill.status-stopped {
+    color: var(--text-dim);
+}
+
+.status-pill.status-recording {
+    color: var(--red);
+    border-color: var(--red);
+    animation: pulse-border 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 84, 112, 0.45); }
+    50% { box-shadow: 0 0 0 10px rgba(255, 84, 112, 0); }
+}
+
+.banner {
+    margin: 16px 32px 0;
+    padding: 16px 20px;
+    border-radius: 10px;
+    font-size: 1.1rem;
+}
+
+.banner-error {
+    background: rgba(255, 84, 112, 0.12);
+    border: 1px solid var(--red);
+    color: #ffd7de;
+}
+
+.controls {
+    display: flex;
+    gap: 20px;
+    padding: 24px 32px;
+}
+
+.btn {
+    font-size: 1.4rem;
+    font-weight: 700;
+    padding: 18px 40px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.1s ease, opacity 0.2s ease;
+}
+
+.btn:active {
+    transform: scale(0.97);
+}
+
+.btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.btn-start {
+    background: var(--green);
+    color: #05231a;
+}
+
+.btn-stop {
+    background: var(--red);
+    color: #2a0410;
+}
+
+.layout {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 24px;
+    padding: 0 32px 32px;
+    align-items: start;
+}
+
+@media (max-width: 1000px) {
+    .layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 24px;
+}
+
+.panel h2 {
+    margin: 0 0 16px;
+    font-size: 1.3rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.transcript-box {
+    height: 60vh;
+    overflow-y: auto;
+    font-size: 1.15rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.transcript-box .final-text {
+    color: var(--text);
+}
+
+.transcript-box .interim-text {
+    color: var(--text-dim);
+    font-style: italic;
+}
+
+.placeholder {
+    color: var(--text-dim);
+    font-style: italic;
+}
+
+.storyboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 18px;
+    max-height: 75vh;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: card-in 0.4s ease-out;
+}
+
+.card.card-error {
+    border-color: var(--amber);
+}
+
+@keyframes card-in {
+    from {
+        opacity: 0;
+        transform: translateY(14px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.card-emoji {
+    font-size: 2.2rem;
+    line-height: 1;
+}
+
+.card-time {
+    font-size: 0.95rem;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 4px 10px;
+    border-radius: 999px;
+}
+
+.card-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.card-summary {
+    font-size: 1rem;
+    color: var(--text-dim);
+    margin: 0;
+}
+
+.card-error .card-summary {
+    color: #ffe4b8;
+}
