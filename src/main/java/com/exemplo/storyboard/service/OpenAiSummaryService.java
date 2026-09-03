@@ -39,7 +39,7 @@ public class OpenAiSummaryService {
     private static final String OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
     private static final String OPENAI_IMAGES_URL = "https://api.openai.com/v1/images/generations";
     private static final String CHAT_MODEL = "gpt-4o-mini";
-    private static final String IMAGE_MODEL = "dall-e-3";
+    private static final String IMAGE_MODEL = "gpt-image-1";
     private static final int CORRECT_MAX_TOKENS = 300;
     private static final int SCENE_MAX_TOKENS = 400;
 
@@ -152,10 +152,10 @@ public class OpenAiSummaryService {
         root.put("prompt", IMAGE_STYLE_PREFIX + imagePrompt);
         root.put("n", 1);
         root.put("size", "1024x1024");
-        root.put("quality", "standard");
-        // Não envia "response_format": a API não aceita mais esse parâmetro (rejeitado com
-        // "Unknown parameter" em contas mais novas) — o formato de retorno (b64_json ou url,
-        // dependendo do modelo/conta) é tratado abaixo, aceitando qualquer um dos dois.
+        root.put("quality", "medium");
+        // Não envia "response_format": gpt-image-1 não aceita esse parâmetro (sempre devolve
+        // b64_json) — o formato de retorno é tratado abaixo, aceitando b64_json ou url (para
+        // manter compatibilidade caso o modelo mude no futuro).
 
         String requestBody;
         try {

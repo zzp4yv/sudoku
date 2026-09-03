@@ -26,9 +26,16 @@ para rodar em um notebook conectado a um projetor durante a palestra.
   completa (já corrigida) fica disponível em um painel ao lado, sempre rolando para o trecho
   mais recente.
 
-> **Custo:** cada card gera uma imagem via DALL·E 3 (qualidade padrão, 1024×1024), que tem
+> **Custo:** cada card gera uma imagem via `gpt-image-1` (qualidade média, 1024×1024), que tem
 > custo por chamada na sua conta OpenAI além do uso de texto — vale considerar isso para
 > palestras longas com muitos cards.
+
+> **Verificação de organização:** o `gpt-image-1` exige que a organização da sua conta OpenAI
+> esteja com a **verificação de identidade** concluída (em
+> [platform.openai.com](https://platform.openai.com) → Settings → Organization → General) —
+> isso é separado de só ter um cartão cadastrado. Sem essa verificação, `/api/illustrate` volta
+> com um erro `403` explicando isso diretamente no card. A verificação pode levar até ~30
+> minutos para propagar depois de concluída.
 
 ## Requisitos
 
