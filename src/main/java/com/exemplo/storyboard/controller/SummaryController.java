@@ -3,7 +3,7 @@ package com.exemplo.storyboard.controller;
 import com.exemplo.storyboard.dto.ErrorResponse;
 import com.exemplo.storyboard.dto.SummarizeRequest;
 import com.exemplo.storyboard.dto.SummarizeResponse;
-import com.exemplo.storyboard.service.AnthropicSummaryService;
+import com.exemplo.storyboard.service.OpenAiSummaryService;
 import com.exemplo.storyboard.service.SummaryGenerationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,9 +18,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class SummaryController {
 
-    private final AnthropicSummaryService summaryService;
+    private final OpenAiSummaryService summaryService;
 
-    public SummaryController(AnthropicSummaryService summaryService) {
+    public SummaryController(OpenAiSummaryService summaryService) {
         this.summaryService = summaryService;
     }
 

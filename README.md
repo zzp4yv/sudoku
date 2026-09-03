@@ -9,8 +9,8 @@ durante a palestra.
 
 - A transcrição de fala roda inteiramente no navegador, usando a **Web Speech API**.
 - Sempre que o(a) palestrante faz uma pausa (~2,5s de silêncio) ou o trecho acumulado fica
-  muito longo, o trecho transcrito é enviado ao backend, que chama a **API de Mensagens da
-  Anthropic** para gerar um card de storyboard: um emoji, um título curto e um resumo de 1-2
+  muito longo, o trecho transcrito é enviado ao backend, que chama a **API de Chat Completions
+  da OpenAI** para gerar um card de storyboard: um emoji, um título curto e um resumo de 1-2
   frases em português.
 - Os cards vão se acumulando em uma grade visual (o "storyboard") enquanto a transcrição
   completa fica disponível em um painel ao lado, sempre rolando para o trecho mais recente.
@@ -22,13 +22,8 @@ durante a palestra.
 - Um navegador baseado em Chromium — **Google Chrome** ou **Microsoft Edge** — pois a Web
   Speech API (reconhecimento de fala) não é suportada em todos os navegadores (por exemplo,
   Firefox não suporta).
-- Uma variável de ambiente `ANTHROPIC_API_KEY` com uma chave válida da API da Anthropic.
-  - Se a sua chave for do tipo **"identity-linked"** (vinculada à sua conta pessoal, comum
-    quando você tem acesso a mais de um workspace numa organização), a API vai exigir que você
-    também informe em qual workspace a requisição deve atuar. Nesse caso, defina também
-    `ANTHROPIC_WORKSPACE_ID` com o ID do workspace (visível no console da Anthropic, em
-    Settings → Workspaces). Chaves clássicas (`sk-ant-api03-...`, geradas para um workspace
-    específico) não precisam dessa variável.
+- Uma variável de ambiente `OPENAI_API_KEY` com uma chave válida da API da OpenAI (gerada em
+  [platform.openai.com/api-keys](https://platform.openai.com/api-keys)).
 - Uma interface de áudio USB (opcional, mas recomendada para captar o áudio da palestra)
   configurada como o **dispositivo de entrada (microfone) padrão do sistema operacional**.
   O navegador captura automaticamente o microfone padrão do sistema — não é necessário
@@ -37,9 +32,7 @@ durante a palestra.
 ## Como executar
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-# só necessário para chaves "identity-linked" (veja a nota em Requisitos acima)
-export ANTHROPIC_WORKSPACE_ID=wrkspc_...
+export OPENAI_API_KEY=sk-...
 ./mvnw spring-boot:run
 ```
 
@@ -68,7 +61,7 @@ Depois, acesse [http://localhost:8080](http://localhost:8080).
 - Spring Boot 3 (Java 17)
 - HTML/CSS/JS estático (sem framework de frontend), servido diretamente pelo Spring Boot
 - Web Speech API (reconhecimento de fala no navegador)
-- API de Mensagens da Anthropic (geração dos resumos do storyboard)
+- API de Chat Completions da OpenAI, modelo `gpt-4o-mini` (geração dos resumos do storyboard)
 
 ## Projeto legado
 

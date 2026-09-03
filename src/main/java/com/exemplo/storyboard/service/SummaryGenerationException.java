@@ -2,7 +2,7 @@ package com.exemplo.storyboard.service;
 
 /**
  * Lançada quando não é possível gerar o resumo de um trecho de transcrição
- * (chave de API ausente, erro na chamada à API da Anthropic, ou resposta
+ * (chave de API ausente, erro na chamada à API da OpenAI, ou resposta
  * do modelo em formato inesperado). A mensagem é sempre amigável e em
  * português, pronta para ser devolvida ao cliente dentro de um ErrorResponse.
  */

@@ -18,17 +18,16 @@ import java.time.Duration;
 
 /**
  * Serviço responsável por transformar um trecho de transcrição em um "card"
- * de storyboard (título curto + emoji + resumo), usando a API de Mensagens
- * da Anthropic.
+ * de storyboard (título curto + emoji + resumo), usando a API de Chat
+ * Completions da OpenAI.
  */
 @Service
-public class AnthropicSummaryService {
+public class OpenAiSummaryService {
 
-    private static final Logger log = LoggerFactory.getLogger(AnthropicSummaryService.class);
+    private static final Logger log = LoggerFactory.getLogger(OpenAiSummaryService.class);
 
-    private static final String ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
-    private static final String ANTHROPIC_VERSION = "2023-06-01";
-    private static final String MODEL = "claude-sonnet-5";
+    private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+    private static final String MODEL = "gpt-4o-mini";
     private static final int MAX_TOKENS = 300;
 
     private static final String SYSTEM_PROMPT = """
@@ -47,13 +46,10 @@ public class AnthropicSummaryService {
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
-    @Value("${anthropic.api.key:}")
+    @Value("${openai.api.key:}")
     private String apiKey;
 
-    @Value("${anthropic.workspace.id:}")
-    private String workspaceId;
-
-    public AnthropicSummaryService(ObjectMapper objectMapper) {
+    public OpenAiSummaryService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(15))
@@ -66,32 +62,22 @@ public class AnthropicSummaryService {
      * @param text trecho de transcrição a resumir
      * @return o card gerado
      * @throws SummaryGenerationException se a chave de API não estiver configurada, se a chamada
-     *                                     à API da Anthropic falhar, ou se a resposta do modelo
+     *                                     à API da OpenAI falhar, ou se a resposta do modelo
      *                                     não puder ser interpretada
      */
     public SummarizeResponse summarize(String text) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new SummaryGenerationException(
-                    "Chave da API Anthropic não configurada (defina a variável de ambiente ANTHROPIC_API_KEY)");
+                    "Chave da API OpenAI não configurada (defina a variável de ambiente OPENAI_API_KEY)");
         }
 
         String requestBody = buildRequestBody(text);
 
-        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(ANTHROPIC_API_URL))
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(OPENAI_API_URL))
                 .timeout(Duration.ofSeconds(30))
-                .header("x-api-key", apiKey)
-                .header("anthropic-version", ANTHROPIC_VERSION)
-                .header("content-type", "application/json");
-
-        // Chaves de API "identity-linked" (ligadas a uma conta pessoal com acesso a
-        // múltiplos workspaces) exigem que o workspace de destino seja informado
-        // explicitamente; chaves clássicas (sk-ant-api...) ignoram este cabeçalho.
-        if (workspaceId != null && !workspaceId.isBlank()) {
-            requestBuilder.header("anthropic-workspace-id", workspaceId);
-        }
-
-        HttpRequest request = requestBuilder
+                .header("Authorization", "Bearer " + apiKey)
+                .header("content-type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
 
@@ -100,17 +86,17 @@ public class AnthropicSummaryService {
             response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         } catch (Exception e) {
             throw new SummaryGenerationException(
-                    "Falha ao conectar com a API da Anthropic. Verifique a conexão de rede e tente novamente.", e);
+                    "Falha ao conectar com a API da OpenAI. Verifique a conexão de rede e tente novamente.", e);
         }
 
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            log.error("Anthropic API returned status {}: {}", response.statusCode(), response.body());
+            log.error("OpenAI API returned status {}: {}", response.statusCode(), response.body());
             String upstreamMessage = extractErrorMessage(response.body());
             String detail = upstreamMessage != null
                     ? upstreamMessage
                     : "verifique a chave de API e tente novamente";
             throw new SummaryGenerationException(
-                    "A API da Anthropic retornou um erro (status " + response.statusCode() + "): " + detail);
+                    "A API da OpenAI retornou um erro (status " + response.statusCode() + "): " + detail);
         }
 
         String modelText = extractModelText(response.body());
@@ -121,9 +107,16 @@ public class AnthropicSummaryService {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("model", MODEL);
         root.put("max_tokens", MAX_TOKENS);
-        root.put("system", SYSTEM_PROMPT);
+
+        ObjectNode responseFormat = root.putObject("response_format");
+        responseFormat.put("type", "json_object");
 
         ArrayNode messages = root.putArray("messages");
+
+        ObjectNode systemMessage = messages.addObject();
+        systemMessage.put("role", "system");
+        systemMessage.put("content", SYSTEM_PROMPT);
+
         ObjectNode userMessage = messages.addObject();
         userMessage.put("role", "user");
         userMessage.put("content", text);
@@ -136,8 +129,8 @@ public class AnthropicSummaryService {
     }
 
     /**
-     * Extrai a mensagem de erro de uma resposta de erro da API da Anthropic
-     * (formato {"type": "error", "error": {"type": "...", "message": "..."}}),
+     * Extrai a mensagem de erro de uma resposta de erro da API da OpenAI
+     * (formato {"error": {"message": "...", "type": "...", "code": "..."}}),
      * para que o motivo real (chave inválida, modelo inexistente, corpo malformado etc.)
      * seja logado e reportado em vez de apenas o status HTTP.
      */
@@ -154,21 +147,20 @@ public class AnthropicSummaryService {
     private String extractModelText(String responseBody) {
         try {
             JsonNode root = objectMapper.readTree(responseBody);
-            JsonNode content = root.path("content");
-            if (content.isArray() && content.size() > 0) {
-                JsonNode firstBlock = content.get(0);
-                JsonNode textNode = firstBlock.path("text");
+            JsonNode choices = root.path("choices");
+            if (choices.isArray() && choices.size() > 0) {
+                JsonNode textNode = choices.get(0).path("message").path("content");
                 if (textNode.isTextual()) {
                     return textNode.asText();
                 }
             }
             throw new SummaryGenerationException(
-                    "Resposta inesperada da API da Anthropic (sem conteúdo de texto).");
+                    "Resposta inesperada da API da OpenAI (sem conteúdo de texto).");
         } catch (SummaryGenerationException e) {
             throw e;
         } catch (Exception e) {
             throw new SummaryGenerationException(
-                    "Não foi possível interpretar a resposta da API da Anthropic.", e);
+                    "Não foi possível interpretar a resposta da API da OpenAI.", e);
         }
     }
 
