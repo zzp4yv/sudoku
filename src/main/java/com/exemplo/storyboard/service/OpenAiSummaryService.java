@@ -17,6 +17,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Base64;
 
 /**
  * Serviço que fala com as APIs da OpenAI para três fins:
@@ -152,7 +153,9 @@ public class OpenAiSummaryService {
         root.put("n", 1);
         root.put("size", "1024x1024");
         root.put("quality", "standard");
-        root.put("response_format", "b64_json");
+        // Não envia "response_format": a API não aceita mais esse parâmetro (rejeitado com
+        // "Unknown parameter" em contas mais novas) — o formato de retorno (b64_json ou url,
+        // dependendo do modelo/conta) é tratado abaixo, aceitando qualquer um dos dois.
 
         String requestBody;
         try {
@@ -192,9 +195,18 @@ public class OpenAiSummaryService {
             JsonNode root2 = objectMapper.readTree(response.body());
             JsonNode dataArr = root2.path("data");
             if (dataArr.isArray() && dataArr.size() > 0) {
-                JsonNode b64Node = dataArr.get(0).path("b64_json");
+                JsonNode first = dataArr.get(0);
+
+                JsonNode b64Node = first.path("b64_json");
                 if (b64Node.isTextual() && !b64Node.asText().isBlank()) {
                     return new IllustrationResponse(b64Node.asText());
+                }
+
+                // Algumas contas/modelos devolvem uma URL temporária em vez de base64;
+                // baixa a imagem e converte para manter o mesmo contrato com o frontend.
+                JsonNode urlNode = first.path("url");
+                if (urlNode.isTextual() && !urlNode.asText().isBlank()) {
+                    return new IllustrationResponse(downloadAndEncode(urlNode.asText()));
                 }
             }
             throw new SummaryGenerationException("Resposta inesperada da API de imagens da OpenAI (sem imagem).");
@@ -203,6 +215,26 @@ public class OpenAiSummaryService {
         } catch (Exception e) {
             throw new SummaryGenerationException(
                     "Não foi possível interpretar a resposta da API de imagens da OpenAI.", e);
+        }
+    }
+
+    private String downloadAndEncode(String imageUrl) {
+        HttpRequest imageRequest = HttpRequest.newBuilder()
+                .uri(URI.create(imageUrl))
+                .timeout(Duration.ofSeconds(60))
+                .GET()
+                .build();
+        try {
+            HttpResponse<byte[]> imageResponse = httpClient.send(imageRequest, HttpResponse.BodyHandlers.ofByteArray());
+            if (imageResponse.statusCode() < 200 || imageResponse.statusCode() >= 300) {
+                throw new SummaryGenerationException(
+                        "Falha ao baixar a imagem gerada (status " + imageResponse.statusCode() + ").");
+            }
+            return Base64.getEncoder().encodeToString(imageResponse.body());
+        } catch (SummaryGenerationException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new SummaryGenerationException("Falha ao baixar a imagem gerada pela OpenAI.", e);
         }
     }
 

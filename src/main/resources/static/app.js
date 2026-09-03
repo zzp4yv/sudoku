@@ -162,7 +162,7 @@
         });
     }
 
-    function setCardImageError(card) {
+    function setCardImageError(card, message) {
         replaceCardVisual(card, (visual) => {
             visual.classList.add('card-visual-error');
             const note = document.createElement('span');
@@ -170,6 +170,12 @@
             note.textContent = '🖼️ desenho indisponível';
             visual.appendChild(note);
         });
+        if (message) {
+            const detail = document.createElement('p');
+            detail.className = 'card-note';
+            detail.textContent = message;
+            card.querySelector('.card-title').insertAdjacentElement('afterend', detail);
+        }
     }
 
     function addErrorCard(message, timeLabel) {
@@ -239,7 +245,7 @@
                     .then((imgData) => setCardImage(card, imgData.imageBase64))
                     .catch((err) => {
                         console.error('Falha ao gerar ilustração do card:', err);
-                        setCardImageError(card);
+                        setCardImageError(card, err.friendlyMessage);
                     });
             })
             .catch((err) => {
