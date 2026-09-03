@@ -17,8 +17,10 @@ import java.util.function.Function;
  * <ul>
  *   <li>{@code POST /api/correct}: corrige um trecho de transcrição recém-reconhecido
  *       (chamado a cada pausa da fala);</li>
- *   <li>{@code POST /api/summarize}: gera um card de storyboard (título + vários ícones)
- *       a partir de uma cena mais ampla de texto já corrigido.</li>
+ *   <li>{@code POST /api/summarize}: gera o título e a descrição visual de um card de
+ *       storyboard a partir de uma cena mais ampla de texto já corrigido;</li>
+ *   <li>{@code POST /api/illustrate}: gera a ilustração (estilo sketchnote) do card a
+ *       partir dessa descrição visual.</li>
  * </ul>
  */
 @RestController
@@ -38,6 +40,11 @@ public class SummaryController {
     @PostMapping("/api/summarize")
     public ResponseEntity<?> summarize(@RequestBody(required = false) SummarizeRequest request) {
         return handle(request, summaryService::summarizeScene);
+    }
+
+    @PostMapping("/api/illustrate")
+    public ResponseEntity<?> illustrate(@RequestBody(required = false) SummarizeRequest request) {
+        return handle(request, summaryService::illustrate);
     }
 
     private <T> ResponseEntity<?> handle(SummarizeRequest request, Function<String, T> action) {

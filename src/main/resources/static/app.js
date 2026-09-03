@@ -121,23 +121,55 @@
         storyboardEl.appendChild(placeholder);
     }
 
-    function addCard(data, timeLabel) {
+    /**
+     * Cria o card já na grade, com o título e um estado de "desenhando…" no lugar da
+     * ilustração — que ainda vai demorar alguns segundos para chegar (API de imagens).
+     * Retorna o elemento do card, para setCardImage/setCardImageError atualizá-lo depois.
+     */
+    function createCardShell(title, timeLabel) {
         clearStoryboardPlaceholder();
-        const icons = Array.isArray(data.icons) && data.icons.length > 0 ? data.icons : ['📝'];
-        const iconsHtml = icons
-            .map((icon) => '<span class="card-icon">' + escapeHtml(icon) + '</span>')
-            .join('');
-
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML =
-            '<div class="card-visual">' +
+            '<div class="card-visual card-visual-loading">' +
                 '<span class="card-time">' + escapeHtml(timeLabel) + '</span>' +
-                '<div class="card-icons">' + iconsHtml + '</div>' +
+                '<span class="card-loading-note">✏️ desenhando…</span>' +
             '</div>' +
-            '<h3 class="card-title">' + escapeHtml(data.title || '') + '</h3>';
+            '<h3 class="card-title">' + escapeHtml(title || '') + '</h3>';
         storyboardEl.appendChild(card);
         storyboardEl.scrollTop = storyboardEl.scrollHeight;
+        return card;
+    }
+
+    function replaceCardVisual(card, buildContent) {
+        const visual = card.querySelector('.card-visual');
+        visual.classList.remove('card-visual-loading');
+        const timeBadge = visual.querySelector('.card-time');
+        visual.innerHTML = '';
+        if (timeBadge) {
+            visual.appendChild(timeBadge);
+        }
+        buildContent(visual);
+    }
+
+    function setCardImage(card, imageBase64) {
+        replaceCardVisual(card, (visual) => {
+            const img = document.createElement('img');
+            img.className = 'card-image';
+            img.alt = '';
+            img.src = 'data:image/png;base64,' + imageBase64;
+            visual.appendChild(img);
+        });
+    }
+
+    function setCardImageError(card) {
+        replaceCardVisual(card, (visual) => {
+            visual.classList.add('card-visual-error');
+            const note = document.createElement('span');
+            note.className = 'card-loading-note';
+            note.textContent = '🖼️ desenho indisponível';
+            visual.appendChild(note);
+        });
     }
 
     function addErrorCard(message, timeLabel) {
@@ -147,7 +179,7 @@
         card.innerHTML =
             '<div class="card-visual card-visual-error">' +
                 '<span class="card-time">' + escapeHtml(timeLabel) + '</span>' +
-                '<div class="card-icons"><span class="card-icon">⚠️</span></div>' +
+                '<span class="card-loading-note">⚠️</span>' +
             '</div>' +
             '<h3 class="card-title">Resumo indisponível</h3>' +
             '<p class="card-note">' + escapeHtml(message) + '</p>';
@@ -177,9 +209,10 @@
     }
 
     /**
-     * Envia o texto acumulado da cena para gerar um card de storyboard com vários
-     * ícones. `force` ignora os limites mínimos (usado ao encerrar a gravação, para
-     * não perder o que ainda não completou uma cena inteira).
+     * Envia o texto acumulado da cena para gerar um card de storyboard. `force` ignora
+     * os limites mínimos (usado ao encerrar a gravação, para não perder o que ainda não
+     * completou uma cena inteira). O card aparece com o título assim que a IA de texto
+     * responde; a ilustração (mais lenta) chega em seguida e substitui o placeholder.
      */
     function flushScene(force) {
         const text = sceneBuffer.trim();
@@ -196,7 +229,19 @@
         const timeLabel = formatElapsed(elapsedMs);
 
         postJson('/api/summarize', text)
-            .then((data) => addCard(data, timeLabel))
+            .then((data) => {
+                const card = createCardShell(data.title, timeLabel);
+                if (!data.imagePrompt) {
+                    setCardImageError(card);
+                    return;
+                }
+                postJson('/api/illustrate', data.imagePrompt)
+                    .then((imgData) => setCardImage(card, imgData.imageBase64))
+                    .catch((err) => {
+                        console.error('Falha ao gerar ilustração do card:', err);
+                        setCardImageError(card);
+                    });
+            })
             .catch((err) => {
                 console.error('Falha ao gerar card do storyboard:', err);
                 addErrorCard(err.friendlyMessage || '⚠️ não foi possível gerar o resumo deste trecho', timeLabel);

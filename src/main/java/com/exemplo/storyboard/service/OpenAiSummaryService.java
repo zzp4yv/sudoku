@@ -1,6 +1,7 @@
 package com.exemplo.storyboard.service;
 
 import com.exemplo.storyboard.dto.CorrectResponse;
+import com.exemplo.storyboard.dto.IllustrationResponse;
 import com.exemplo.storyboard.dto.SummarizeResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,17 +17,17 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
- * Serviço que fala com a API de Chat Completions da OpenAI para dois fins:
+ * Serviço que fala com as APIs da OpenAI para três fins:
  * <ul>
  *   <li>{@link #correct(String)}: corrige rapidamente um trecho recém-reconhecido
  *       (chamado a cada pausa da fala, para manter a transcrição ao vivo legível);</li>
  *   <li>{@link #summarizeScene(String)}: a partir de uma "cena" mais ampla (vários
- *       trechos já corrigidos e acumulados), gera um card de storyboard com vários
- *       ícones representando as diferentes ações/ideias mencionadas.</li>
+ *       trechos já corrigidos e acumulados), gera o título e a descrição visual
+ *       (para ilustração) de um card de storyboard;</li>
+ *   <li>{@link #illustrate(String)}: gera a ilustração em si (estilo sketchnote/
+ *       graphic recording) a partir dessa descrição visual, via API de imagens.</li>
  * </ul>
  */
 @Service
@@ -34,11 +35,19 @@ public class OpenAiSummaryService {
 
     private static final Logger log = LoggerFactory.getLogger(OpenAiSummaryService.class);
 
-    private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
-    private static final String MODEL = "gpt-4o-mini";
+    private static final String OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
+    private static final String OPENAI_IMAGES_URL = "https://api.openai.com/v1/images/generations";
+    private static final String CHAT_MODEL = "gpt-4o-mini";
+    private static final String IMAGE_MODEL = "dall-e-3";
     private static final int CORRECT_MAX_TOKENS = 300;
-    private static final int SCENE_MAX_TOKENS = 300;
-    private static final String DEFAULT_ICON = "📝";
+    private static final int SCENE_MAX_TOKENS = 400;
+
+    private static final String IMAGE_STYLE_PREFIX =
+            "A single hand-drawn sketchnote / graphic-recording style illustration, like a live "
+            + "conference visual note-taker's drawing: black ink doodle line art with minimal, "
+            + "sparse color accents, clean and expressive, simple iconic shapes grouped together "
+            + "in one composition. No text, no letters, no words, no captions anywhere in the "
+            + "image. Scene: ";
 
     private static final String CORRECTION_SYSTEM_PROMPT = """
             Você recebe um trecho bruto de transcrição de fala (speech-to-text) de uma palestra em português.
@@ -60,21 +69,23 @@ public class OpenAiSummaryService {
             Você recebe um trecho (já corrigido) de transcrição de fala de uma palestra em português,
             cobrindo uma parte da fala do(a) palestrante ao longo de alguns segundos.
 
-            Sua tarefa é identificar pelo menos 3 ações, ideias ou tópicos distintos mencionados nesse
-            trecho e representar cada um como um único emoji, formando juntos um pequeno quadro de
-            storyboard com várias cenas.
+            Sua tarefa é imaginar uma única cena visual, no estilo de um "sketchnote" (registro visual
+            gráfico feito à mão, como os que ilustradores fazem ao vivo em conferências): vários elementos
+            simples desenhados numa mesma composição, não uma foto realista. Essa cena deve representar,
+            juntos, pelo menos 3 ações/ideias/tópicos diferentes mencionados no trecho.
 
             Responda APENAS com um objeto JSON compacto, sem markdown, sem crases, sem texto antes ou depois,
             exatamente no seguinte formato:
-            {"title": "...", "icons": ["...", "...", "..."]}
+            {"title": "...", "imagePrompt": "..."}
 
             Regras:
-            - "icons": um array com pelo menos 3 emojis (até 5), cada um representando visualmente uma
-              ação/ideia/tópico diferente mencionado no trecho, na ordem aproximada em que foram ditos.
-              Evite repetir o mesmo emoji. Se o trecho realmente só tiver 1 ou 2 ideias distintas e não
-              der para chegar a 3 sem forçar, use o máximo de emojis distintos e relevantes que fizer
-              sentido (mínimo 2).
-            - "title": uma legenda curta (no máximo 8 palavras) para o conjunto do trecho, em português.
+            - "title": uma legenda curta (no máximo 8 palavras) para a cena, em português.
+            - "imagePrompt": uma descrição em INGLÊS da cena a ser desenhada, para um gerador de imagens.
+              Descreva elementos concretos (pessoas, objetos, ações, símbolos) que juntos representem pelo
+              menos 3 ações/ideias distintas do trecho, como se fossem vários pequenos desenhos de um
+              sketchnote reunidos numa composição. Não descreva texto, letras ou legendas dentro da imagem.
+            - Se o trecho realmente só tiver 1 ou 2 ideias distintas, descreva o máximo de elementos
+              relevantes que fizer sentido (mínimo 2), sem inventar conteúdo que não foi dito.
             - Não inclua nenhum texto fora do objeto JSON.
             """;
 
@@ -93,15 +104,9 @@ public class OpenAiSummaryService {
 
     /**
      * Corrige um trecho de transcrição recém-reconhecido (chamado a cada pausa da fala).
-     *
-     * @param text trecho bruto a corrigir
-     * @return o trecho corrigido
-     * @throws SummaryGenerationException se a chave de API não estiver configurada, se a chamada
-     *                                     à API da OpenAI falhar, ou se a resposta do modelo
-     *                                     não puder ser interpretada
      */
     public CorrectResponse correct(String text) {
-        JsonNode node = callModel(CORRECTION_SYSTEM_PROMPT, text, CORRECT_MAX_TOKENS);
+        JsonNode node = callChat(CORRECTION_SYSTEM_PROMPT, text, CORRECT_MAX_TOKENS);
         JsonNode correctedNode = node.path("correctedText");
         String corrected = correctedNode.isTextual() && !correctedNode.asText().isBlank()
                 ? correctedNode.asText()
@@ -110,36 +115,95 @@ public class OpenAiSummaryService {
     }
 
     /**
-     * Gera um card de storyboard (título + vários ícones) a partir de uma cena mais ampla:
-     * o texto já corrigido de vários trechos acumulados, com conteúdo suficiente para
-     * identificar múltiplas ações/ideias distintas.
-     *
-     * @param correctedSceneText texto já corrigido da cena a resumir visualmente
-     * @return o card gerado, com pelo menos 2 ícones
-     * @throws SummaryGenerationException se a chave de API não estiver configurada, se a chamada
-     *                                     à API da OpenAI falhar, ou se a resposta do modelo
-     *                                     não puder ser interpretada
+     * Gera o título e a descrição visual de um card de storyboard a partir de uma cena
+     * mais ampla: o texto já corrigido de vários trechos acumulados, com conteúdo
+     * suficiente para identificar múltiplas ações/ideias distintas.
      */
     public SummarizeResponse summarizeScene(String correctedSceneText) {
-        JsonNode node = callModel(SCENE_SYSTEM_PROMPT, correctedSceneText, SCENE_MAX_TOKENS);
+        JsonNode node = callChat(SCENE_SYSTEM_PROMPT, correctedSceneText, SCENE_MAX_TOKENS);
 
         JsonNode titleNode = node.path("title");
+        JsonNode imagePromptNode = node.path("imagePrompt");
         String title = titleNode.isTextual() ? titleNode.asText() : "";
+        String imagePrompt = imagePromptNode.isTextual() ? imagePromptNode.asText() : correctedSceneText;
 
-        List<String> icons = new ArrayList<>();
-        JsonNode iconsNode = node.path("icons");
-        if (iconsNode.isArray()) {
-            for (JsonNode icon : iconsNode) {
-                if (icon.isTextual() && !icon.asText().isBlank()) {
-                    icons.add(icon.asText());
+        return new SummarizeResponse(title, imagePrompt);
+    }
+
+    /**
+     * Gera a ilustração (estilo sketchnote) de um card a partir da descrição visual
+     * produzida por {@link #summarizeScene(String)}.
+     *
+     * @param imagePrompt descrição em inglês da cena a ser desenhada
+     * @return a imagem gerada, em base64
+     * @throws SummaryGenerationException se a chave de API não estiver configurada, se a chamada
+     *                                     à API de imagens da OpenAI falhar, ou se a resposta
+     *                                     não contiver uma imagem
+     */
+    public IllustrationResponse illustrate(String imagePrompt) {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new SummaryGenerationException(
+                    "Chave da API OpenAI não configurada (defina a variável de ambiente OPENAI_API_KEY)");
+        }
+
+        ObjectNode root = objectMapper.createObjectNode();
+        root.put("model", IMAGE_MODEL);
+        root.put("prompt", IMAGE_STYLE_PREFIX + imagePrompt);
+        root.put("n", 1);
+        root.put("size", "1024x1024");
+        root.put("quality", "standard");
+        root.put("response_format", "b64_json");
+
+        String requestBody;
+        try {
+            requestBody = objectMapper.writeValueAsString(root);
+        } catch (Exception e) {
+            throw new SummaryGenerationException("Falha interna ao preparar a requisição de imagem.", e);
+        }
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(OPENAI_IMAGES_URL))
+                .timeout(Duration.ofSeconds(90))
+                .header("Authorization", "Bearer " + apiKey)
+                .header("content-type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+        HttpResponse<String> response;
+        try {
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (Exception e) {
+            throw new SummaryGenerationException(
+                    "Falha ao conectar com a API de imagens da OpenAI. Verifique a conexão de rede e tente novamente.",
+                    e);
+        }
+
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            log.error("OpenAI Images API returned status {}: {}", response.statusCode(), response.body());
+            String upstreamMessage = extractErrorMessage(response.body());
+            String detail = upstreamMessage != null
+                    ? upstreamMessage
+                    : "verifique a chave de API e tente novamente";
+            throw new SummaryGenerationException(
+                    "A API de imagens da OpenAI retornou um erro (status " + response.statusCode() + "): " + detail);
+        }
+
+        try {
+            JsonNode root2 = objectMapper.readTree(response.body());
+            JsonNode dataArr = root2.path("data");
+            if (dataArr.isArray() && dataArr.size() > 0) {
+                JsonNode b64Node = dataArr.get(0).path("b64_json");
+                if (b64Node.isTextual() && !b64Node.asText().isBlank()) {
+                    return new IllustrationResponse(b64Node.asText());
                 }
             }
+            throw new SummaryGenerationException("Resposta inesperada da API de imagens da OpenAI (sem imagem).");
+        } catch (SummaryGenerationException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new SummaryGenerationException(
+                    "Não foi possível interpretar a resposta da API de imagens da OpenAI.", e);
         }
-        if (icons.isEmpty()) {
-            icons.add(DEFAULT_ICON);
-        }
-
-        return new SummarizeResponse(title, icons);
     }
 
     /**
@@ -147,16 +211,16 @@ public class OpenAiSummaryService {
      * usuário informados, e devolve o corpo JSON já decodificado da resposta do modelo
      * (depois de remover eventuais blocos de código markdown ao redor).
      */
-    private JsonNode callModel(String systemPrompt, String userText, int maxTokens) {
+    private JsonNode callChat(String systemPrompt, String userText, int maxTokens) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new SummaryGenerationException(
                     "Chave da API OpenAI não configurada (defina a variável de ambiente OPENAI_API_KEY)");
         }
 
-        String requestBody = buildRequestBody(systemPrompt, userText, maxTokens);
+        String requestBody = buildChatRequestBody(systemPrompt, userText, maxTokens);
 
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(OPENAI_API_URL))
+                .uri(URI.create(OPENAI_CHAT_URL))
                 .timeout(Duration.ofSeconds(30))
                 .header("Authorization", "Bearer " + apiKey)
                 .header("content-type", "application/json")
@@ -191,9 +255,9 @@ public class OpenAiSummaryService {
         }
     }
 
-    private String buildRequestBody(String systemPrompt, String userText, int maxTokens) {
+    private String buildChatRequestBody(String systemPrompt, String userText, int maxTokens) {
         ObjectNode root = objectMapper.createObjectNode();
-        root.put("model", MODEL);
+        root.put("model", CHAT_MODEL);
         root.put("max_tokens", maxTokens);
 
         ObjectNode responseFormat = root.putObject("response_format");

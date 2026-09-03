@@ -1,9 +1,9 @@
 # Storyboard da Palestra
 
 Aplicação web em Java com Spring Boot para transcrição contínua ao vivo durante palestras,
-com geração automática de um **storyboard visual** (cards com vários ícones representando as
-ações/ideias faladas) via IA. Pensada para rodar em um notebook conectado a um projetor durante
-a palestra.
+com geração automática de um **storyboard visual** (cards com uma ilustração no estilo
+"sketchnote"/registro visual gráfico, representando as ações/ideias faladas) via IA. Pensada
+para rodar em um notebook conectado a um projetor durante a palestra.
 
 ## Como funciona
 
@@ -14,12 +14,21 @@ a palestra.
   texto corrigido, que substitui o texto bruto no painel de transcrição.
 - Esses trechos corrigidos vão se acumulando numa "cena"; só quando há conteúdo suficiente
   (pelo menos duas pausas processadas, ou um volume maior de texto) a cena inteira é enviada
-  para `POST /api/summarize`, que gera um card do storyboard com um título e **vários ícones**
-  (o objetivo é representar 3 ou mais ações/ideias distintas ditas naquele trecho, não só a
+  para `POST /api/summarize`, que gera um título e uma descrição visual da cena (o objetivo é
+  que essa descrição cubra 3 ou mais ações/ideias distintas ditas naquele trecho, não só a
   última frase) — por isso um card pode demorar mais de uma pausa para aparecer.
+- Essa descrição é enviada para `POST /api/illustrate`, que chama a **API de imagens da OpenAI
+  (DALL·E 3)** para desenhar a cena num estilo de sketchnote (rabiscado à mão, com múltiplos
+  elementos numa composição só). Como gerar a imagem leva alguns segundos, o card aparece
+  primeiro só com o título (com um indicador de "desenhando…") e a ilustração é preenchida
+  assim que fica pronta.
 - Os cards vão se acumulando em uma grade visual (o "storyboard") enquanto a transcrição
   completa (já corrigida) fica disponível em um painel ao lado, sempre rolando para o trecho
   mais recente.
+
+> **Custo:** cada card gera uma imagem via DALL·E 3 (qualidade padrão, 1024×1024), que tem
+> custo por chamada na sua conta OpenAI além do uso de texto — vale considerar isso para
+> palestras longas com muitos cards.
 
 ## Requisitos
 
