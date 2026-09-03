@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +23,8 @@ import java.time.Duration;
  */
 @Service
 public class AnthropicSummaryService {
+
+    private static final Logger log = LoggerFactory.getLogger(AnthropicSummaryService.class);
 
     private static final String ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
     private static final String ANTHROPIC_VERSION = "2023-06-01";
@@ -88,9 +92,13 @@ public class AnthropicSummaryService {
         }
 
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            log.error("Anthropic API returned status {}: {}", response.statusCode(), response.body());
+            String upstreamMessage = extractErrorMessage(response.body());
+            String detail = upstreamMessage != null
+                    ? upstreamMessage
+                    : "verifique a chave de API e tente novamente";
             throw new SummaryGenerationException(
-                    "A API da Anthropic retornou um erro (status " + response.statusCode()
-                            + "). Verifique a chave de API e tente novamente.");
+                    "A API da Anthropic retornou um erro (status " + response.statusCode() + "): " + detail);
         }
 
         String modelText = extractModelText(response.body());
@@ -112,6 +120,22 @@ public class AnthropicSummaryService {
             return objectMapper.writeValueAsString(root);
         } catch (Exception e) {
             throw new SummaryGenerationException("Falha interna ao preparar a requisição para a IA.", e);
+        }
+    }
+
+    /**
+     * Extrai a mensagem de erro de uma resposta de erro da API da Anthropic
+     * (formato {"type": "error", "error": {"type": "...", "message": "..."}}),
+     * para que o motivo real (chave inválida, modelo inexistente, corpo malformado etc.)
+     * seja logado e reportado em vez de apenas o status HTTP.
+     */
+    private String extractErrorMessage(String responseBody) {
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            JsonNode message = root.path("error").path("message");
+            return message.isTextual() ? message.asText() : null;
+        } catch (Exception e) {
+            return null;
         }
     }
 
