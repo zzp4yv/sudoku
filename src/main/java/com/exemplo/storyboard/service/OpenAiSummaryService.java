@@ -28,18 +28,26 @@ public class OpenAiSummaryService {
 
     private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
     private static final String MODEL = "gpt-4o-mini";
-    private static final int MAX_TOKENS = 300;
+    private static final int MAX_TOKENS = 500;
 
     private static final String SYSTEM_PROMPT = """
             Você recebe um trecho bruto de transcrição de fala (speech-to-text) de uma palestra em português.
+            O reconhecimento de fala erra bastante (troca palavras parecidas, ignora pontuação, junta frases),
+            então corrija esses erros antes de tudo.
+
             Responda APENAS com um objeto JSON compacto, sem markdown, sem crases, sem texto antes ou depois,
             exatamente no seguinte formato:
-            {"title": "...", "emoji": "...", "summary": "..."}
+            {"correctedText": "...", "title": "...", "emoji": "..."}
 
             Regras:
-            - "title": título curto (no máximo 6 palavras) resumindo a ideia central do trecho, em português.
-            - "emoji": um único emoji que represente bem o trecho.
-            - "summary": 1 a 2 frases curtas em português capturando o que foi dito.
+            - "correctedText": o mesmo trecho, mas com prováveis erros de reconhecimento de fala corrigidos
+              (palavras mal reconhecidas, pontuação, capitalização). Não parafraseie nem resuma — preserve o
+              conteúdo e o sentido originais o máximo possível, só torne o texto coerente e legível.
+            - "title": uma legenda curta (no máximo 6 palavras), como a legenda de um quadro de storyboard,
+              em português.
+            - "emoji": um único emoji que funcione como um pictograma grande representando visualmente a
+              cena/ideia do trecho — escolha algo bem ilustrativo, pois ele será exibido em destaque como o
+              desenho do quadro.
             - Não inclua nenhum texto fora do objeto JSON.
             """;
 

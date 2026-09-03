@@ -19,10 +19,16 @@
     let recognition = null;
     let state = 'stopped'; // 'stopped' | 'recording'
     let sessionStartTime = 0;
-    let finalTranscript = '';
     let pendingBuffer = '';
     let interimText = '';
     let pauseTimer = null;
+    let nextSegmentId = 1;
+
+    // Cada trecho enviado para /api/summarize vira um "segmento": o texto bruto
+    // reconhecido pelo navegador (rawText) é exibido de imediato e, quando a IA
+    // responde, é substituído por correctedText (que corrige erros típicos do
+    // reconhecimento de fala) diretamente no painel de transcrição.
+    let transcriptSegments = [];
 
     function checkSupport() {
         if (!SpeechRecognitionClass) {
@@ -56,17 +62,29 @@
 
     function renderTranscript() {
         transcriptEl.innerHTML = '';
-        if (!finalTranscript && !interimText) {
+        const hasContent = transcriptSegments.length > 0 || pendingBuffer || interimText;
+        if (!hasContent) {
             const placeholder = document.createElement('span');
             placeholder.className = 'placeholder';
             placeholder.textContent = 'A transcrição aparecerá aqui assim que você iniciar a gravação…';
             transcriptEl.appendChild(placeholder);
             return;
         }
-        const finalSpan = document.createElement('span');
-        finalSpan.className = 'final-text';
-        finalSpan.textContent = finalTranscript;
-        transcriptEl.appendChild(finalSpan);
+
+        for (const segment of transcriptSegments) {
+            const span = document.createElement('span');
+            const isCorrected = segment.correctedText != null;
+            span.className = 'final-text' + (isCorrected ? '' : ' segment-pending');
+            span.textContent = (isCorrected ? segment.correctedText : segment.rawText) + ' ';
+            transcriptEl.appendChild(span);
+        }
+
+        if (pendingBuffer) {
+            const pendingSpan = document.createElement('span');
+            pendingSpan.className = 'final-text';
+            pendingSpan.textContent = pendingBuffer;
+            transcriptEl.appendChild(pendingSpan);
+        }
 
         if (interimText) {
             const interimSpan = document.createElement('span');
@@ -97,12 +115,11 @@
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML =
-            '<div class="card-top">' +
-                '<span class="card-emoji">' + escapeHtml(data.emoji || '📝') + '</span>' +
+            '<div class="card-visual">' +
                 '<span class="card-time">' + escapeHtml(timeLabel) + '</span>' +
+                '<span class="card-emoji">' + escapeHtml(data.emoji || '📝') + '</span>' +
             '</div>' +
-            '<h3 class="card-title">' + escapeHtml(data.title || '') + '</h3>' +
-            '<p class="card-summary">' + escapeHtml(data.summary || '') + '</p>';
+            '<h3 class="card-title">' + escapeHtml(data.title || '') + '</h3>';
         storyboardEl.appendChild(card);
         storyboardEl.scrollTop = storyboardEl.scrollHeight;
     }
@@ -112,17 +129,17 @@
         const card = document.createElement('div');
         card.className = 'card card-error';
         card.innerHTML =
-            '<div class="card-top">' +
-                '<span class="card-emoji">⚠️</span>' +
+            '<div class="card-visual card-visual-error">' +
                 '<span class="card-time">' + escapeHtml(timeLabel) + '</span>' +
+                '<span class="card-emoji">⚠️</span>' +
             '</div>' +
             '<h3 class="card-title">Resumo indisponível</h3>' +
-            '<p class="card-summary">' + escapeHtml(message) + '</p>';
+            '<p class="card-note">' + escapeHtml(message) + '</p>';
         storyboardEl.appendChild(card);
         storyboardEl.scrollTop = storyboardEl.scrollHeight;
     }
 
-    async function sendToBackend(text, elapsedMs) {
+    async function sendToBackend(text, elapsedMs, segmentId) {
         const timeLabel = formatElapsed(elapsedMs);
         try {
             const response = await fetch('/api/summarize', {
@@ -146,6 +163,13 @@
             }
 
             const data = await response.json();
+
+            const segment = transcriptSegments.find((s) => s.id === segmentId);
+            if (segment) {
+                segment.correctedText = (data.correctedText && data.correctedText.trim()) || segment.rawText;
+                renderTranscript();
+            }
+
             addCard(data, timeLabel);
         } catch (err) {
             console.error('Falha ao chamar /api/summarize:', err);
@@ -175,8 +199,13 @@
             return;
         }
         pendingBuffer = '';
+
+        const segmentId = nextSegmentId++;
+        transcriptSegments.push({ id: segmentId, rawText: text, correctedText: null });
+        renderTranscript();
+
         const elapsedMs = Date.now() - sessionStartTime;
-        sendToBackend(text, elapsedMs);
+        sendToBackend(text, elapsedMs, segmentId);
     }
 
     function handleResult(event) {
@@ -188,7 +217,6 @@
             const piece = result[0].transcript;
             if (result.isFinal) {
                 hasFinal = true;
-                finalTranscript += piece + ' ';
                 pendingBuffer += piece + ' ';
             } else {
                 interim += piece;
@@ -284,7 +312,8 @@
         hidePermissionBanner();
 
         // Limpa o estado para começar uma nova sessão.
-        finalTranscript = '';
+        transcriptSegments = [];
+        nextSegmentId = 1;
         pendingBuffer = '';
         interimText = '';
         if (pauseTimer) {

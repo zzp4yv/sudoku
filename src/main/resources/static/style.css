@@ -158,6 +158,11 @@ body {
 
 .transcript-box .final-text {
     color: var(--text);
+    transition: opacity 0.3s ease;
+}
+
+.transcript-box .final-text.segment-pending {
+    opacity: 0.6;
 }
 
 .transcript-box .interim-text {
@@ -183,10 +188,10 @@ body {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 14px;
-    padding: 18px;
+    padding: 14px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
     animation: card-in 0.4s ease-out;
 }
 
@@ -205,38 +210,60 @@ body {
     }
 }
 
-.card-top {
+/* O "quadro" do storyboard: um pictograma grande num painel com borda
+   tracejada, lembrando um quadro rascunhado à mão. */
+.card-visual {
+    position: relative;
+    aspect-ratio: 4 / 3;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
+    background: repeating-linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.02),
+        rgba(255, 255, 255, 0.02) 10px,
+        rgba(255, 255, 255, 0.04) 10px,
+        rgba(255, 255, 255, 0.04) 20px
+    );
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+}
+
+.card-visual-error {
+    border-color: var(--amber);
 }
 
 .card-emoji {
-    font-size: 2.2rem;
+    font-size: 4rem;
     line-height: 1;
 }
 
 .card-time {
-    font-size: 0.95rem;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 0.85rem;
     color: var(--text-dim);
     font-variant-numeric: tabular-nums;
-    background: rgba(255, 255, 255, 0.05);
-    padding: 4px 10px;
+    background: rgba(0, 0, 0, 0.35);
+    padding: 3px 9px;
     border-radius: 999px;
 }
 
 .card-title {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     font-weight: 700;
     margin: 0;
+    text-align: center;
 }
 
-.card-summary {
-    font-size: 1rem;
+.card-note {
+    font-size: 0.9rem;
     color: var(--text-dim);
     margin: 0;
+    text-align: center;
 }
 
-.card-error .card-summary {
+.card-error .card-note {
     color: #ffe4b8;
 }
