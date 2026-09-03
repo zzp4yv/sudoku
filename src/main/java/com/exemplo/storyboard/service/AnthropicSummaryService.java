@@ -50,6 +50,9 @@ public class AnthropicSummaryService {
     @Value("${anthropic.api.key:}")
     private String apiKey;
 
+    @Value("${anthropic.workspace.id:}")
+    private String workspaceId;
+
     public AnthropicSummaryService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
@@ -74,12 +77,21 @@ public class AnthropicSummaryService {
 
         String requestBody = buildRequestBody(text);
 
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(ANTHROPIC_API_URL))
                 .timeout(Duration.ofSeconds(30))
                 .header("x-api-key", apiKey)
                 .header("anthropic-version", ANTHROPIC_VERSION)
-                .header("content-type", "application/json")
+                .header("content-type", "application/json");
+
+        // Chaves de API "identity-linked" (ligadas a uma conta pessoal com acesso a
+        // múltiplos workspaces) exigem que o workspace de destino seja informado
+        // explicitamente; chaves clássicas (sk-ant-api...) ignoram este cabeçalho.
+        if (workspaceId != null && !workspaceId.isBlank()) {
+            requestBuilder.header("anthropic-workspace-id", workspaceId);
+        }
+
+        HttpRequest request = requestBuilder
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
 
