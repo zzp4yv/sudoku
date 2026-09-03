@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storyboard da Palestra</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="app-header">
+        <h1>🎤 Storyboard da Palestra</h1>
+        <div id="status-pill" class="status-pill status-stopped">
+            <span id="status-text">Parado</span>
+        </div>
+    </header>
+
+    <div id="unsupported-banner" class="banner banner-error" hidden>
+        ⚠️ Seu navegador não é compatível com reconhecimento de fala. Use o
+        <strong>Google Chrome</strong> ou o <strong>Microsoft Edge</strong> para usar esta ferramenta.
+    </div>
+
+    <div id="permission-banner" class="banner banner-error" hidden>
+        ⚠️ <span id="permission-message"></span>
+    </div>
+
+    <div class="controls">
+        <button id="btn-start" class="btn btn-start">▶ Iniciar</button>
+        <button id="btn-stop" class="btn btn-stop" disabled>■ Encerrar</button>
+    </div>
+
+    <main class="layout">
+        <section class="panel transcript-panel">
+            <h2>Transcrição ao vivo</h2>
+            <div id="transcript" class="transcript-box">
+                <span class="placeholder">A transcrição aparecerá aqui assim que você iniciar a gravação…</span>
+            </div>
+        </section>
+
+        <section class="panel storyboard-panel">
+            <h2>Storyboard</h2>
+            <div id="storyboard" class="storyboard-grid">
+                <span class="placeholder">Os cards do storyboard aparecerão aqui conforme a palestra avança…</span>
+            </div>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
