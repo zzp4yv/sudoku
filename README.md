@@ -1,19 +1,25 @@
 # Storyboard da Palestra
 
 Aplicação web em Java com Spring Boot para transcrição contínua ao vivo durante palestras,
-com geração automática de um **storyboard visual** (cards com título, emoji e resumo) via IA,
-criado a cada pausa natural da fala. Pensada para rodar em um notebook conectado a um projetor
-durante a palestra.
+com geração automática de um **storyboard visual** (cards com vários ícones representando as
+ações/ideias faladas) via IA. Pensada para rodar em um notebook conectado a um projetor durante
+a palestra.
 
 ## Como funciona
 
 - A transcrição de fala roda inteiramente no navegador, usando a **Web Speech API**.
-- Sempre que o(a) palestrante faz uma pausa (~2,5s de silêncio) ou o trecho acumulado fica
-  muito longo, o trecho transcrito é enviado ao backend, que chama a **API de Chat Completions
-  da OpenAI** para gerar um card de storyboard: um emoji, um título curto e um resumo de 1-2
-  frases em português.
+- Sempre que o(a) palestrante faz uma pausa (~2,5s de silêncio) ou o trecho acumulado fica muito
+  longo, o trecho é enviado ao backend (`POST /api/correct`), que chama a **API de Chat
+  Completions da OpenAI** para corrigir erros típicos de reconhecimento de fala e devolve o
+  texto corrigido, que substitui o texto bruto no painel de transcrição.
+- Esses trechos corrigidos vão se acumulando numa "cena"; só quando há conteúdo suficiente
+  (pelo menos duas pausas processadas, ou um volume maior de texto) a cena inteira é enviada
+  para `POST /api/summarize`, que gera um card do storyboard com um título e **vários ícones**
+  (o objetivo é representar 3 ou mais ações/ideias distintas ditas naquele trecho, não só a
+  última frase) — por isso um card pode demorar mais de uma pausa para aparecer.
 - Os cards vão se acumulando em uma grade visual (o "storyboard") enquanto a transcrição
-  completa fica disponível em um painel ao lado, sempre rolando para o trecho mais recente.
+  completa (já corrigida) fica disponível em um painel ao lado, sempre rolando para o trecho
+  mais recente.
 
 ## Requisitos
 

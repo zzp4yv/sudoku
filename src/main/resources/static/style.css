@@ -177,7 +177,7 @@ body {
 
 .storyboard-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 18px;
     max-height: 75vh;
     overflow-y: auto;
@@ -233,9 +233,29 @@ body {
     border-color: var(--amber);
 }
 
-.card-emoji {
-    font-size: 4rem;
+/* Vários ícones lado a lado, com leve rotação alternada, formando uma
+   pequena "colagem" de cenas dentro do quadro (em vez de um único ícone). */
+.card-icons {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px 10px;
+    padding: 10px;
+}
+
+.card-icon {
+    font-size: 2.4rem;
     line-height: 1;
+    display: inline-block;
+}
+
+.card-icon:nth-child(odd) {
+    transform: rotate(-6deg);
+}
+
+.card-icon:nth-child(even) {
+    transform: rotate(5deg);
 }
 
 .card-time {
